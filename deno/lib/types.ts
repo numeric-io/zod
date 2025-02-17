@@ -630,7 +630,6 @@ export type ZodStringCheck =
 export interface ZodStringDef extends ZodTypeDef {
   checks: ZodStringCheck[];
   typeName: ZodFirstPartyTypeKind.ZodString;
-  coerce: boolean;
 }
 
 const cuidRegex = /^c[^\s-]{8,}$/i;
@@ -772,9 +771,6 @@ function isValidCidr(ip: string, version?: IpVersion) {
 
 export class ZodString extends ZodType<string, ZodStringDef, string> {
   _parse(input: ParseInput): ParseReturnType<string> {
-    if (this._def.coerce) {
-      input.data = String(input.data);
-    }
     const parsedType = this._getType(input);
 
     if (parsedType !== ZodParsedType.string) {
@@ -1373,11 +1369,10 @@ export class ZodString extends ZodType<string, ZodStringDef, string> {
     return max;
   }
 
-  static create = (params?: RawCreateParams & { coerce?: true }): ZodString => {
+  static create = (params?: RawCreateParams): ZodString => {
     return new ZodString({
       checks: [],
       typeName: ZodFirstPartyTypeKind.ZodString,
-      coerce: params?.coerce ?? false,
       ...processCreateParams(params),
     });
   };
@@ -1410,14 +1405,10 @@ function floatSafeRemainder(val: number, step: number) {
 export interface ZodNumberDef extends ZodTypeDef {
   checks: ZodNumberCheck[];
   typeName: ZodFirstPartyTypeKind.ZodNumber;
-  coerce: boolean;
 }
 
 export class ZodNumber extends ZodType<number, ZodNumberDef, number> {
   _parse(input: ParseInput): ParseReturnType<number> {
-    if (this._def.coerce) {
-      input.data = Number(input.data);
-    }
     const parsedType = this._getType(input);
     if (parsedType !== ZodParsedType.number) {
       const ctx = this._getOrReturnCtx(input);
@@ -1503,13 +1494,10 @@ export class ZodNumber extends ZodType<number, ZodNumberDef, number> {
     return { status: status.value, value: input.data };
   }
 
-  static create = (
-    params?: RawCreateParams & { coerce?: boolean }
-  ): ZodNumber => {
+  static create = (params?: RawCreateParams): ZodNumber => {
     return new ZodNumber({
       checks: [],
       typeName: ZodFirstPartyTypeKind.ZodNumber,
-      coerce: params?.coerce || false,
       ...processCreateParams(params),
     });
   };
@@ -1695,18 +1683,10 @@ export type ZodBigIntCheck =
 export interface ZodBigIntDef extends ZodTypeDef {
   checks: ZodBigIntCheck[];
   typeName: ZodFirstPartyTypeKind.ZodBigInt;
-  coerce: boolean;
 }
 
 export class ZodBigInt extends ZodType<bigint, ZodBigIntDef, bigint> {
   _parse(input: ParseInput): ParseReturnType<bigint> {
-    if (this._def.coerce) {
-      try {
-        input.data = BigInt(input.data);
-      } catch {
-        return this._getInvalidInput(input);
-      }
-    }
     const parsedType = this._getType(input);
     if (parsedType !== ZodParsedType.bigint) {
       return this._getInvalidInput(input);
@@ -1774,13 +1754,10 @@ export class ZodBigInt extends ZodType<bigint, ZodBigIntDef, bigint> {
     return INVALID;
   }
 
-  static create = (
-    params?: RawCreateParams & { coerce?: boolean }
-  ): ZodBigInt => {
+  static create = (params?: RawCreateParams): ZodBigInt => {
     return new ZodBigInt({
       checks: [],
       typeName: ZodFirstPartyTypeKind.ZodBigInt,
-      coerce: params?.coerce ?? false,
       ...processCreateParams(params),
     });
   };
@@ -1904,14 +1881,10 @@ export class ZodBigInt extends ZodType<bigint, ZodBigIntDef, bigint> {
 //////////////////////////////////////////
 export interface ZodBooleanDef extends ZodTypeDef {
   typeName: ZodFirstPartyTypeKind.ZodBoolean;
-  coerce: boolean;
 }
 
 export class ZodBoolean extends ZodType<boolean, ZodBooleanDef, boolean> {
   _parse(input: ParseInput): ParseReturnType<boolean> {
-    if (this._def.coerce) {
-      input.data = Boolean(input.data);
-    }
     const parsedType = this._getType(input);
 
     if (parsedType !== ZodParsedType.boolean) {
@@ -1926,12 +1899,9 @@ export class ZodBoolean extends ZodType<boolean, ZodBooleanDef, boolean> {
     return OK(input.data);
   }
 
-  static create = (
-    params?: RawCreateParams & { coerce?: boolean }
-  ): ZodBoolean => {
+  static create = (params?: RawCreateParams): ZodBoolean => {
     return new ZodBoolean({
       typeName: ZodFirstPartyTypeKind.ZodBoolean,
-      coerce: params?.coerce || false,
       ...processCreateParams(params),
     });
   };
@@ -1949,15 +1919,11 @@ export type ZodDateCheck =
   | { kind: "max"; value: number; message?: string };
 export interface ZodDateDef extends ZodTypeDef {
   checks: ZodDateCheck[];
-  coerce: boolean;
   typeName: ZodFirstPartyTypeKind.ZodDate;
 }
 
 export class ZodDate extends ZodType<Date, ZodDateDef, Date> {
   _parse(input: ParseInput): ParseReturnType<this["_output"]> {
-    if (this._def.coerce) {
-      input.data = new Date(input.data);
-    }
     const parsedType = this._getType(input);
 
     if (parsedType !== ZodParsedType.date) {
@@ -2064,12 +2030,9 @@ export class ZodDate extends ZodType<Date, ZodDateDef, Date> {
     return max != null ? new Date(max) : null;
   }
 
-  static create = (
-    params?: RawCreateParams & { coerce?: boolean }
-  ): ZodDate => {
+  static create = (params?: RawCreateParams): ZodDate => {
     return new ZodDate({
       checks: [],
-      coerce: params?.coerce || false,
       typeName: ZodFirstPartyTypeKind.ZodDate,
       ...processCreateParams(params),
     });
@@ -5415,22 +5378,6 @@ const pipelineType = ZodPipeline.create;
 const ostring = () => stringType().optional();
 const onumber = () => numberType().optional();
 const oboolean = () => booleanType().optional();
-
-export const coerce = {
-  string: ((arg) =>
-    ZodString.create({ ...arg, coerce: true })) as (typeof ZodString)["create"],
-  number: ((arg) =>
-    ZodNumber.create({ ...arg, coerce: true })) as (typeof ZodNumber)["create"],
-  boolean: ((arg) =>
-    ZodBoolean.create({
-      ...arg,
-      coerce: true,
-    })) as (typeof ZodBoolean)["create"],
-  bigint: ((arg) =>
-    ZodBigInt.create({ ...arg, coerce: true })) as (typeof ZodBigInt)["create"],
-  date: ((arg) =>
-    ZodDate.create({ ...arg, coerce: true })) as (typeof ZodDate)["create"],
-};
 
 export {
   anyType as any,
