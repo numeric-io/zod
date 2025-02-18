@@ -467,7 +467,6 @@ export abstract class ZodType<
     this.and = this.and.bind(this);
     this.brand = this.brand.bind(this);
     this.default = this.default.bind(this);
-    this.catch = this.catch.bind(this);
     this.describe = this.describe.bind(this);
     this.pipe = this.pipe.bind(this);
     this.readonly = this.readonly.bind(this);
@@ -524,21 +523,6 @@ export abstract class ZodType<
       type: this,
       ...processCreateParams(this._def),
     });
-  }
-
-  catch(def: Output): ZodCatch<this>;
-  catch(
-    def: (ctx: { error: ZodError; input: Input }) => Output
-  ): ZodCatch<this>;
-  catch(def: any) {
-    const catchValueFunc = typeof def === "function" ? def : () => def;
-
-    return new ZodCatch({
-      ...processCreateParams(this._def),
-      innerType: this,
-      catchValue: catchValueFunc,
-      typeName: ZodFirstPartyTypeKind.ZodCatch,
-    }) as any;
   }
 
   describe(description: string): this {
@@ -3194,8 +3178,6 @@ const getDiscriminator = <T extends ZodTypeAny>(type: T): Primitive[] => {
     return getDiscriminator(type.unwrap());
   } else if (type instanceof ZodReadonly) {
     return getDiscriminator(type.unwrap());
-  } else if (type instanceof ZodCatch) {
-    return getDiscriminator(type._def.innerType);
   } else {
     return [];
   }
@@ -4783,96 +4765,6 @@ export class ZodDefault<T extends ZodTypeAny> extends ZodType<
   };
 }
 
-//////////////////////////////////////////
-//////////////////////////////////////////
-//////////                      //////////
-//////////       ZodCatch       //////////
-//////////                      //////////
-//////////////////////////////////////////
-//////////////////////////////////////////
-export interface ZodCatchDef<T extends ZodTypeAny = ZodTypeAny>
-  extends ZodTypeDef {
-  innerType: T;
-  catchValue: (ctx: { error: ZodError; input: unknown }) => T["_input"];
-  typeName: ZodFirstPartyTypeKind.ZodCatch;
-}
-
-export class ZodCatch<T extends ZodTypeAny> extends ZodType<
-  T["_output"],
-  ZodCatchDef<T>,
-  unknown // any input will pass validation // T["_input"]
-> {
-  _parse(input: ParseInput): ParseReturnType<this["_output"]> {
-    const { ctx } = this._processInputParams(input);
-
-    // newCtx is used to not collect issues from inner types in ctx
-    const newCtx: ParseContext = {
-      ...ctx,
-      common: {
-        ...ctx.common,
-        issues: [],
-      },
-    };
-
-    const result = this._def.innerType._parse({
-      data: newCtx.data,
-      path: newCtx.path,
-      parent: {
-        ...newCtx,
-      },
-    });
-
-    if (isAsync(result)) {
-      return result.then((result) => {
-        return {
-          status: "valid",
-          value:
-            result.status === "valid"
-              ? result.value
-              : this._def.catchValue({
-                  get error() {
-                    return new ZodError(newCtx.common.issues);
-                  },
-                  input: newCtx.data,
-                }),
-        };
-      });
-    } else {
-      return {
-        status: "valid",
-        value:
-          result.status === "valid"
-            ? result.value
-            : this._def.catchValue({
-                get error() {
-                  return new ZodError(newCtx.common.issues);
-                },
-                input: newCtx.data,
-              }),
-      };
-    }
-  }
-
-  removeCatch() {
-    return this._def.innerType;
-  }
-
-  static create = <T extends ZodTypeAny>(
-    type: T,
-    params: RawCreateParams & {
-      catch: T["_output"] | (() => T["_output"]);
-    }
-  ): ZodCatch<T> => {
-    return new ZodCatch({
-      innerType: type,
-      typeName: ZodFirstPartyTypeKind.ZodCatch,
-      catchValue:
-        typeof params.catch === "function" ? params.catch : () => params.catch,
-      ...processCreateParams(params),
-    });
-  };
-}
-
 /////////////////////////////////////////
 /////////////////////////////////////////
 //////////                     //////////
@@ -5184,7 +5076,6 @@ export enum ZodFirstPartyTypeKind {
   ZodOptional = "ZodOptional",
   ZodNullable = "ZodNullable",
   ZodDefault = "ZodDefault",
-  ZodCatch = "ZodCatch",
   ZodPromise = "ZodPromise",
   ZodBranded = "ZodBranded",
   ZodPipeline = "ZodPipeline",
@@ -5221,7 +5112,6 @@ export type ZodFirstPartySchemaTypes =
   | ZodOptional<any>
   | ZodNullable<any>
   | ZodDefault<any>
-  | ZodCatch<any>
   | ZodPromise<any>
   | ZodBranded<any, any>
   | ZodPipeline<any, any>

@@ -70,8 +70,6 @@ test("first party switch", () => {
       break;
     case z.ZodFirstPartyTypeKind.ZodDefault:
       break;
-    case z.ZodFirstPartyTypeKind.ZodCatch:
-      break;
     case z.ZodFirstPartyTypeKind.ZodPromise:
       break;
     case z.ZodFirstPartyTypeKind.ZodBranded:
