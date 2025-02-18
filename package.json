@@ -1,10 +1,10 @@
 {
-  "name": "zod",
-  "version": "3.24.2",
-  "author": "Colin McDonnell <colin@colinhacks.com>",
+  "name": "@numeric-io/zod",
+  "version": "1.0.0",
+  "author": "Justin Chang <justin.p.chang@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/colinhacks/zod.git"
+    "url": "git+https://github.com/numeric-io/zod.git"
   },
   "main": "./lib/index.js",
   "module": "./lib/index.mjs",
@@ -56,16 +56,12 @@
     "./package.json": "./package.json",
     "./locales/*": "./lib/locales/*"
   },
-  "bugs": {
-    "url": "https://github.com/colinhacks/zod/issues"
-  },
-  "description": "TypeScript-first schema declaration and validation library with static type inference",
+  "description": "Numeric's fork of Zod that does not deep copy objects and records when parsing.",
   "files": [
     "/lib",
     "/index.d.ts"
   ],
-  "funding": "https://github.com/sponsors/colinhacks",
-  "homepage": "https://zod.dev",
+  "homepage": "https://github.com/numeric-io/zod",
   "keywords": [
     "typescript",
     "schema",
@@ -113,10 +109,5 @@
     "docs": "netlify dev"
   },
   "sideEffects": false,
-  "support": {
-    "backing": {
-      "npm-funding": true
-    }
-  },
   "types": "./index.d.ts"
 }
