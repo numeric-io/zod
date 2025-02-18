@@ -34,25 +34,6 @@ test("catch replace wrong types", () => {
   expect(z.string().catch("default").parse({})).toBe("default");
 });
 
-test("catch with transform", () => {
-  const stringWithDefault = z
-    .string()
-    .transform((val) => val.toUpperCase())
-    .catch("default");
-  expect(stringWithDefault.parse(undefined)).toBe("default");
-  expect(stringWithDefault.parse(15)).toBe("default");
-  expect(stringWithDefault).toBeInstanceOf(z.ZodCatch);
-  expect(stringWithDefault._def.innerType).toBeInstanceOf(z.ZodEffects);
-  expect(stringWithDefault._def.innerType._def.schema).toBeInstanceOf(
-    z.ZodSchema
-  );
-
-  type inp = z.input<typeof stringWithDefault>;
-  util.assertEqual<inp, unknown>(true);
-  type out = z.output<typeof stringWithDefault>;
-  util.assertEqual<out, string>(true);
-});
-
 test("catch on existing optional", () => {
   const stringWithDefault = z.string().optional().catch("asdf");
   expect(stringWithDefault.parse(undefined)).toBe(undefined);
@@ -76,22 +57,6 @@ test("optional on catch", () => {
   util.assertEqual<inp, unknown>(true);
   type out = z.output<typeof stringWithDefault>;
   util.assertEqual<out, string | undefined>(true);
-});
-
-test("complex chain example", () => {
-  const complex = z
-    .string()
-    .catch("asdf")
-    .transform((val) => val + "!")
-    .transform((val) => val.toUpperCase())
-    .catch("qwer")
-    .removeCatch()
-    .optional()
-    .catch("asdfasdf");
-
-  expect(complex.parse("qwer")).toBe("QWER!");
-  expect(complex.parse(15)).toBe("ASDF!");
-  expect(complex.parse(true)).toBe("ASDF!");
 });
 
 test("removeCatch", () => {

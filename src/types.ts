@@ -465,7 +465,6 @@ export abstract class ZodType<
     this.promise = this.promise.bind(this);
     this.or = this.or.bind(this);
     this.and = this.and.bind(this);
-    this.transform = this.transform.bind(this);
     this.brand = this.brand.bind(this);
     this.default = this.default.bind(this);
     this.catch = this.catch.bind(this);
@@ -503,17 +502,6 @@ export abstract class ZodType<
 
   and<T extends ZodTypeAny>(incoming: T): ZodIntersection<this, T> {
     return ZodIntersection.create(this, incoming, this._def);
-  }
-
-  transform<NewOut>(
-    transform: (arg: Output, ctx: RefinementCtx) => NewOut | Promise<NewOut>
-  ): ZodEffects<this, NewOut> {
-    return new ZodEffects({
-      ...processCreateParams(this._def),
-      schema: this,
-      typeName: ZodFirstPartyTypeKind.ZodEffects,
-      effect: { type: "transform", transform },
-    }) as any;
   }
 
   default(def: util.noUndefined<Input>): ZodDefault<this>;
@@ -4553,18 +4541,7 @@ export type RefinementEffect<T> = {
   type: "refinement";
   refinement: (arg: T, ctx: RefinementCtx) => any;
 };
-export type TransformEffect<T> = {
-  type: "transform";
-  transform: (arg: T, ctx: RefinementCtx) => any;
-};
-export type PreprocessEffect<T> = {
-  type: "preprocess";
-  transform: (arg: T, ctx: RefinementCtx) => any;
-};
-export type Effect<T> =
-  | RefinementEffect<T>
-  | TransformEffect<T>
-  | PreprocessEffect<T>;
+export type Effect<T> = RefinementEffect<T>;
 
 export interface ZodEffectsDef<T extends ZodTypeAny = ZodTypeAny>
   extends ZodTypeDef {
@@ -4609,108 +4586,43 @@ export class ZodEffects<
 
     checkCtx.addIssue = checkCtx.addIssue.bind(checkCtx);
 
-    if (effect.type === "preprocess") {
-      const processed = effect.transform(ctx.data, checkCtx);
-
+    const executeRefinement = (acc: unknown): any => {
+      const result = effect.refinement(acc, checkCtx);
       if (ctx.common.async) {
-        return Promise.resolve(processed).then(async (processed) => {
-          if (status.value === "aborted") return INVALID;
-
-          const result = await this._def.schema._parseAsync({
-            data: processed,
-            path: ctx.path,
-            parent: ctx,
-          });
-          if (result.status === "aborted") return INVALID;
-          if (result.status === "dirty") return DIRTY(result.value);
-          if (status.value === "dirty") return DIRTY(result.value);
-          return result;
-        });
-      } else {
-        if (status.value === "aborted") return INVALID;
-        const result = this._def.schema._parseSync({
-          data: processed,
-          path: ctx.path,
-          parent: ctx,
-        });
-        if (result.status === "aborted") return INVALID;
-        if (result.status === "dirty") return DIRTY(result.value);
-        if (status.value === "dirty") return DIRTY(result.value);
-        return result;
+        return Promise.resolve(result);
       }
-    }
-    if (effect.type === "refinement") {
-      const executeRefinement = (acc: unknown): any => {
-        const result = effect.refinement(acc, checkCtx);
-        if (ctx.common.async) {
-          return Promise.resolve(result);
-        }
-        if (result instanceof Promise) {
-          throw new Error(
-            "Async refinement encountered during synchronous parse operation. Use .parseAsync instead."
-          );
-        }
-        return acc;
-      };
-
-      if (ctx.common.async === false) {
-        const inner = this._def.schema._parseSync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx,
-        });
-        if (inner.status === "aborted") return INVALID;
-        if (inner.status === "dirty") status.dirty();
-
-        // return value is ignored
-        executeRefinement(inner.value);
-        return { status: status.value, value: inner.value };
-      } else {
-        return this._def.schema
-          ._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx })
-          .then((inner) => {
-            if (inner.status === "aborted") return INVALID;
-            if (inner.status === "dirty") status.dirty();
-
-            return executeRefinement(inner.value).then(() => {
-              return { status: status.value, value: inner.value };
-            });
-          });
+      if (result instanceof Promise) {
+        throw new Error(
+          "Async refinement encountered during synchronous parse operation. Use .parseAsync instead."
+        );
       }
-    }
+      return acc;
+    };
 
-    if (effect.type === "transform") {
-      if (ctx.common.async === false) {
-        const base = this._def.schema._parseSync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx,
-        });
+    if (ctx.common.async === false) {
+      const inner = this._def.schema._parseSync({
+        data: ctx.data,
+        path: ctx.path,
+        parent: ctx,
+      });
+      if (inner.status === "aborted") return INVALID;
+      if (inner.status === "dirty") status.dirty();
 
-        if (!isValid(base)) return base;
+      // return value is ignored
+      executeRefinement(inner.value);
+      return { status: status.value, value: inner.value };
+    } else {
+      return this._def.schema
+        ._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx })
+        .then((inner) => {
+          if (inner.status === "aborted") return INVALID;
+          if (inner.status === "dirty") status.dirty();
 
-        const result = effect.transform(base.value, checkCtx);
-        if (result instanceof Promise) {
-          throw new Error(
-            `Asynchronous transform encountered during synchronous parse operation. Use .parseAsync instead.`
-          );
-        }
-
-        return { status: status.value, value: result };
-      } else {
-        return this._def.schema
-          ._parseAsync({ data: ctx.data, path: ctx.path, parent: ctx })
-          .then((base) => {
-            if (!isValid(base)) return base;
-
-            return Promise.resolve(effect.transform(base.value, checkCtx)).then(
-              (result) => ({ status: status.value, value: result })
-            );
+          return executeRefinement(inner.value).then(() => {
+            return { status: status.value, value: inner.value };
           });
-      }
+        });
     }
-
-    util.assertNever(effect);
   }
 
   static create = <I extends ZodTypeAny>(
@@ -4722,19 +4634,6 @@ export class ZodEffects<
       schema,
       typeName: ZodFirstPartyTypeKind.ZodEffects,
       effect,
-      ...processCreateParams(params),
-    });
-  };
-
-  static createWithPreprocess = <I extends ZodTypeAny>(
-    preprocess: (arg: unknown, ctx: RefinementCtx) => unknown,
-    schema: I,
-    params?: RawCreateParams
-  ): ZodEffects<I, I["_output"], unknown> => {
-    return new ZodEffects({
-      schema,
-      effect: { type: "preprocess", transform: preprocess },
-      typeName: ZodFirstPartyTypeKind.ZodEffects,
       ...processCreateParams(params),
     });
   };
@@ -5373,7 +5272,6 @@ const promiseType = ZodPromise.create;
 const effectsType = ZodEffects.create;
 const optionalType = ZodOptional.create;
 const nullableType = ZodNullable.create;
-const preprocessType = ZodEffects.createWithPreprocess;
 const pipelineType = ZodPipeline.create;
 const ostring = () => stringType().optional();
 const onumber = () => numberType().optional();
@@ -5406,7 +5304,6 @@ export {
   optionalType as optional,
   ostring,
   pipelineType as pipeline,
-  preprocessType as preprocess,
   promiseType as promise,
   recordType as record,
   setType as set,

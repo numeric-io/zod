@@ -237,35 +237,3 @@ test("params and returnType getters", () => {
   func.parameters().items[0].parse("asdf");
   func.returnType().parse("asdf");
 });
-
-test("inference with transforms", () => {
-  const funcSchema = z
-    .function()
-    .args(z.string().transform((val) => val.length))
-    .returns(z.object({ val: z.number() }));
-  const myFunc = funcSchema.implement((val) => {
-    return { val, extra: "stuff" };
-  });
-  myFunc("asdf");
-
-  util.assertEqual<
-    typeof myFunc,
-    (arg: string, ...args_1: unknown[]) => { val: number; extra: string }
-  >(true);
-});
-
-test("fallback to OuterTypeOfFunction", () => {
-  const funcSchema = z
-    .function()
-    .args(z.string().transform((val) => val.length))
-    .returns(z.object({ arg: z.number() }).transform((val) => val.arg));
-
-  const myFunc = funcSchema.implement((val) => {
-    return { arg: val, arg2: false };
-  });
-
-  util.assertEqual<
-    typeof myFunc,
-    (arg: string, ...args_1: unknown[]) => number
-  >(true);
-});
