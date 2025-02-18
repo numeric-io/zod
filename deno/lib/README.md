@@ -4,13 +4,13 @@ This fork does not deep copy objects and records when parsing. This speeds parsi
 
 Because of this, I also removed the following features which did not make sense when the input data is mutable:
 
-    catch
-    coerce
-    default
-    intersection/and (in favor of merge)
-    pipe
-    preprocess
-    transform
+- catch
+- coerce
+- default
+- intersection/and (in favor of merge)
+- pipe
+- preprocess
+- transform
 
 I've kept refinements in for now, since they don't affect anything. But I do hate them.
 
