@@ -2510,9 +2510,7 @@ export class ZodObject<
     const { status, ctx } = this._processInputParams(input);
     const { shape, keys: shapeKeys } = this._getCached();
 
-    // Validate each key in the defined shape.
-    // Instead of building new output pairs, we simply run each validator.
-    // (If any field returns INVALID, we mark the status as dirty.)
+    // Validate each pair in the defined shape.
     const validations: ParseReturnType<any>[] = [];
     for (const key of shapeKeys) {
       const keyValidator = shape[key];
@@ -2575,8 +2573,6 @@ export class ZodObject<
       }
     }
 
-    // If asynchronous mode is active, wait for all validations to complete.
-    // Otherwise, return immediately.
     if (ctx.common.async) {
       return Promise.all(validations).then(() => {
         const merged = ParseStatus.mergeValidations(status, validations as any);
