@@ -74,17 +74,20 @@ test("nonstrict by default", () => {
   });
 });
 
-const data = {
-  points: 2314,
-  unknown: "asdf",
-};
-
 test("strip by default", () => {
+  const data = {
+    points: 2314,
+    unknown: "asdf",
+  };
   const val = z.object({ points: z.number() }).parse(data);
   expect(val).toEqual({ points: 2314 });
 });
 
 test("unknownkeys override", () => {
+  const data = {
+    points: 2314,
+    unknown: "asdf",
+  };
   const val = z
     .object({ points: z.number() })
     .strict()
@@ -97,18 +100,30 @@ test("unknownkeys override", () => {
 });
 
 test("passthrough unknown", () => {
+  const data = {
+    points: 2314,
+    unknown: "asdf",
+  };
   const val = z.object({ points: z.number() }).passthrough().parse(data);
 
   expect(val).toEqual(data);
 });
 
 test("strip unknown", () => {
+  const data = {
+    points: 2314,
+    unknown: "asdf",
+  };
   const val = z.object({ points: z.number() }).strip().parse(data);
 
   expect(val).toEqual({ points: 2314 });
 });
 
 test("strict", () => {
+  const data = {
+    points: 2314,
+    unknown: "asdf",
+  };
   const val = z.object({ points: z.number() }).strict().safeParse(data);
 
   expect(val.success).toEqual(false);
@@ -315,30 +330,6 @@ test("strictcreate", async () => {
 
   const asyncResult = await strictObj.spa({ name: "asdf", unexpected: 13 });
   expect(asyncResult.success).toEqual(false);
-});
-
-test("intersection of object with date", async () => {
-  const schema = z.object({
-    a: z.date(),
-  });
-  expect(schema.and(schema).parse({ a: new Date(1637353595983) })).toEqual({
-    a: new Date(1637353595983),
-  });
-  const result = await schema.parseAsync({ a: new Date(1637353595983) });
-  expect(result).toEqual({ a: new Date(1637353595983) });
-});
-
-test("intersection of object with refine with date", async () => {
-  const schema = z
-    .object({
-      a: z.date(),
-    })
-    .refine(() => true);
-  expect(schema.and(schema).parse({ a: new Date(1637353595983) })).toEqual({
-    a: new Date(1637353595983),
-  });
-  const result = await schema.parseAsync({ a: new Date(1637353595983) });
-  expect(result).toEqual({ a: new Date(1637353595983) });
 });
 
 test("constructor key", () => {

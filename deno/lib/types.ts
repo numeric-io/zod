@@ -6,9 +6,7 @@ import {
   AsyncParseReturnType,
   DIRTY,
   INVALID,
-  isAborted,
   isAsync,
-  isDirty,
   isValid,
   makeIssue,
   OK,
@@ -464,7 +462,6 @@ export abstract class ZodType<
     this.array = this.array.bind(this);
     this.promise = this.promise.bind(this);
     this.or = this.or.bind(this);
-    this.and = this.and.bind(this);
     this.brand = this.brand.bind(this);
     this.describe = this.describe.bind(this);
     this.readonly = this.readonly.bind(this);
@@ -495,10 +492,6 @@ export abstract class ZodType<
 
   or<T extends ZodTypeAny>(option: T): ZodUnion<[this, T]> {
     return ZodUnion.create([this, option], this._def) as any;
-  }
-
-  and<T extends ZodTypeAny>(incoming: T): ZodIntersection<this, T> {
-    return ZodIntersection.create(this, incoming, this._def);
   }
 
   brand<B extends string | number | symbol>(brand?: B): ZodBranded<this, B>;
@@ -2519,16 +2512,9 @@ export class ZodObject<
     const { shape, keys: shapeKeys } = this._getCached();
     const extraKeys: string[] = [];
 
-    if (
-      !(
-        this._def.catchall instanceof ZodNever &&
-        this._def.unknownKeys === "strip"
-      )
-    ) {
-      for (const key in ctx.data) {
-        if (!shapeKeys.includes(key)) {
-          extraKeys.push(key);
-        }
+    for (const key in ctx.data) {
+      if (!shapeKeys.includes(key)) {
+        extraKeys.push(key);
       }
     }
 
@@ -2553,12 +2539,7 @@ export class ZodObject<
       const unknownKeys = this._def.unknownKeys;
 
       if (unknownKeys === "passthrough") {
-        for (const key of extraKeys) {
-          pairs.push({
-            key: { status: "valid", value: key },
-            value: { status: "valid", value: ctx.data[key] },
-          });
-        }
+        // NOTE: (justinpchang) This is default behavior when returning input.
       } else if (unknownKeys === "strict") {
         if (extraKeys.length > 0) {
           addIssueToContext(ctx, {
@@ -2568,6 +2549,9 @@ export class ZodObject<
           status.dirty();
         }
       } else if (unknownKeys === "strip") {
+        for (const key of extraKeys) {
+          delete ctx.data[key];
+        }
       } else {
         throw new Error(`Internal ZodObject error: invalid unknownKeys value.`);
       }
@@ -2603,10 +2587,14 @@ export class ZodObject<
           return syncPairs;
         })
         .then((syncPairs) => {
-          return ParseStatus.mergeObjectSync(status, syncPairs);
+          const merged = ParseStatus.mergeObjectStatus(status, syncPairs);
+          if (isValid(merged)) return OK(ctx.data);
+          return merged;
         });
     } else {
-      return ParseStatus.mergeObjectSync(status, pairs as any);
+      const merged = ParseStatus.mergeObjectStatus(status, pairs as any);
+      if (isValid(merged)) return OK(ctx.data);
+      return merged;
     }
   }
 
@@ -3299,154 +3287,6 @@ export class ZodDiscriminatedUnion<
   }
 }
 
-///////////////////////////////////////////////
-///////////////////////////////////////////////
-//////////                           //////////
-//////////      ZodIntersection      //////////
-//////////                           //////////
-///////////////////////////////////////////////
-///////////////////////////////////////////////
-export interface ZodIntersectionDef<
-  T extends ZodTypeAny = ZodTypeAny,
-  U extends ZodTypeAny = ZodTypeAny
-> extends ZodTypeDef {
-  left: T;
-  right: U;
-  typeName: ZodFirstPartyTypeKind.ZodIntersection;
-}
-
-function mergeValues(
-  a: any,
-  b: any
-): { valid: true; data: any } | { valid: false } {
-  const aType = getParsedType(a);
-  const bType = getParsedType(b);
-
-  if (a === b) {
-    return { valid: true, data: a };
-  } else if (aType === ZodParsedType.object && bType === ZodParsedType.object) {
-    const bKeys = util.objectKeys(b);
-    const sharedKeys = util
-      .objectKeys(a)
-      .filter((key) => bKeys.indexOf(key) !== -1);
-
-    const newObj: any = { ...a, ...b };
-    for (const key of sharedKeys) {
-      const sharedValue = mergeValues(a[key], b[key]);
-      if (!sharedValue.valid) {
-        return { valid: false };
-      }
-      newObj[key] = sharedValue.data;
-    }
-
-    return { valid: true, data: newObj };
-  } else if (aType === ZodParsedType.array && bType === ZodParsedType.array) {
-    if (a.length !== b.length) {
-      return { valid: false };
-    }
-
-    const newArray: unknown[] = [];
-    for (let index = 0; index < a.length; index++) {
-      const itemA = a[index];
-      const itemB = b[index];
-      const sharedValue = mergeValues(itemA, itemB);
-
-      if (!sharedValue.valid) {
-        return { valid: false };
-      }
-
-      newArray.push(sharedValue.data);
-    }
-
-    return { valid: true, data: newArray };
-  } else if (
-    aType === ZodParsedType.date &&
-    bType === ZodParsedType.date &&
-    +a === +b
-  ) {
-    return { valid: true, data: a };
-  } else {
-    return { valid: false };
-  }
-}
-
-export class ZodIntersection<
-  T extends ZodTypeAny,
-  U extends ZodTypeAny
-> extends ZodType<
-  T["_output"] & U["_output"],
-  ZodIntersectionDef<T, U>,
-  T["_input"] & U["_input"]
-> {
-  _parse(input: ParseInput): ParseReturnType<this["_output"]> {
-    const { status, ctx } = this._processInputParams(input);
-    const handleParsed = (
-      parsedLeft: SyncParseReturnType,
-      parsedRight: SyncParseReturnType
-    ): SyncParseReturnType<T & U> => {
-      if (isAborted(parsedLeft) || isAborted(parsedRight)) {
-        return INVALID;
-      }
-
-      const merged = mergeValues(parsedLeft.value, parsedRight.value);
-
-      if (!merged.valid) {
-        addIssueToContext(ctx, {
-          code: ZodIssueCode.invalid_intersection_types,
-        });
-        return INVALID;
-      }
-
-      if (isDirty(parsedLeft) || isDirty(parsedRight)) {
-        status.dirty();
-      }
-
-      return { status: status.value, value: merged.data as any };
-    };
-
-    if (ctx.common.async) {
-      return Promise.all([
-        this._def.left._parseAsync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx,
-        }),
-        this._def.right._parseAsync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx,
-        }),
-      ]).then(([left, right]: any) => handleParsed(left, right));
-    } else {
-      return handleParsed(
-        this._def.left._parseSync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx,
-        }),
-        this._def.right._parseSync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx,
-        })
-      );
-    }
-  }
-
-  static create = <T extends ZodTypeAny, U extends ZodTypeAny>(
-    left: T,
-    right: U,
-    params?: RawCreateParams
-  ): ZodIntersection<T, U> => {
-    return new ZodIntersection({
-      left: left,
-      right: right,
-      typeName: ZodFirstPartyTypeKind.ZodIntersection,
-      ...processCreateParams(params),
-    });
-  };
-}
-
 ////////////////////////////////////////
 ////////////////////////////////////////
 //////////                    //////////
@@ -3652,9 +3492,29 @@ export class ZodRecord<
     }
 
     if (ctx.common.async) {
-      return ParseStatus.mergeObjectAsync(status, pairs);
+      return Promise.resolve()
+        .then(async () => {
+          const syncPairs: any[] = [];
+          for (const pair of pairs) {
+            const key = await pair.key;
+            const value = await pair.value;
+            syncPairs.push({
+              key,
+              value,
+              alwaysSet: pair.alwaysSet,
+            });
+          }
+          return syncPairs;
+        })
+        .then((syncPairs) => {
+          const merged = ParseStatus.mergeObjectStatus(status, syncPairs);
+          if (isValid(merged)) return OK(ctx.data);
+          return merged;
+        });
     } else {
-      return ParseStatus.mergeObjectSync(status, pairs as any);
+      const merged = ParseStatus.mergeObjectStatus(status, pairs as any);
+      if (isValid(merged)) return OK(ctx.data);
+      return merged;
     }
   }
 
@@ -4912,7 +4772,6 @@ export enum ZodFirstPartyTypeKind {
   ZodObject = "ZodObject",
   ZodUnion = "ZodUnion",
   ZodDiscriminatedUnion = "ZodDiscriminatedUnion",
-  ZodIntersection = "ZodIntersection",
   ZodTuple = "ZodTuple",
   ZodRecord = "ZodRecord",
   ZodMap = "ZodMap",
@@ -4946,7 +4805,6 @@ export type ZodFirstPartySchemaTypes =
   | ZodObject<any, any, any>
   | ZodUnion<any>
   | ZodDiscriminatedUnion<any, any>
-  | ZodIntersection<any, any>
   | ZodTuple<any, any>
   | ZodRecord<any, any>
   | ZodMap<any>
@@ -4994,7 +4852,6 @@ const objectType = ZodObject.create;
 const strictObjectType = ZodObject.strictCreate;
 const unionType = ZodUnion.create;
 const discriminatedUnionType = ZodDiscriminatedUnion.create;
-const intersectionType = ZodIntersection.create;
 const tupleType = ZodTuple.create;
 const recordType = ZodRecord.create;
 const mapType = ZodMap.create;
@@ -5023,7 +4880,6 @@ export {
   enumType as enum,
   functionType as function,
   instanceOfType as instanceof,
-  intersectionType as intersection,
   lazyType as lazy,
   literalType as literal,
   mapType as map,

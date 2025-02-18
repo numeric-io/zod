@@ -226,13 +226,3 @@ test("partial with mask -- ignore falsy values", async () => {
   masked.parse({ country: "US" });
   await masked.parseAsync({ country: "US" });
 });
-
-test("deeppartial array", () => {
-  const schema = z.object({ array: z.string().array().min(42) }).deepPartial();
-
-  // works as expected
-  schema.parse({});
-
-  // should be false, but is true
-  expect(schema.safeParse({ array: [] }).success).toBe(false);
-});

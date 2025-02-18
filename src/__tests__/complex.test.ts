@@ -1,5 +1,5 @@
 // @ts-ignore TS6133
-import { expect, test } from "@jest/globals";
+import { test } from "@jest/globals";
 
 import { crazySchema } from "./crazySchema";
 // import * as z from "../index";
@@ -12,8 +12,6 @@ test("parse", () => {
     array: [12, 15, 16],
     // sumTransformer: [12, 15, 16],
     sumMinLength: [12, 15, 16, 98, 24, 63],
-    intersection: {},
-    enum: "one",
     nonstrict: { points: 1234 },
     numProm: Promise.resolve(12),
     lenfun: (x: string) => x.length,
