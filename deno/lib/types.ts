@@ -467,7 +467,6 @@ export abstract class ZodType<
     this.and = this.and.bind(this);
     this.brand = this.brand.bind(this);
     this.describe = this.describe.bind(this);
-    this.pipe = this.pipe.bind(this);
     this.readonly = this.readonly.bind(this);
     this.isNullable = this.isNullable.bind(this);
     this.isOptional = this.isOptional.bind(this);
@@ -519,9 +518,6 @@ export abstract class ZodType<
     });
   }
 
-  pipe<T extends ZodTypeAny>(target: T): ZodPipeline<this, T> {
-    return ZodPipeline.create(this, target);
-  }
   readonly(): ZodReadonly<this> {
     return ZodReadonly.create(this);
   }
@@ -4768,82 +4764,6 @@ export class ZodBranded<
   }
 }
 
-////////////////////////////////////////////
-////////////////////////////////////////////
-//////////                        //////////
-//////////      ZodPipeline       //////////
-//////////                        //////////
-////////////////////////////////////////////
-////////////////////////////////////////////
-
-export interface ZodPipelineDef<A extends ZodTypeAny, B extends ZodTypeAny>
-  extends ZodTypeDef {
-  in: A;
-  out: B;
-  typeName: ZodFirstPartyTypeKind.ZodPipeline;
-}
-
-export class ZodPipeline<
-  A extends ZodTypeAny,
-  B extends ZodTypeAny
-> extends ZodType<B["_output"], ZodPipelineDef<A, B>, A["_input"]> {
-  _parse(input: ParseInput): ParseReturnType<any> {
-    const { status, ctx } = this._processInputParams(input);
-    if (ctx.common.async) {
-      const handleAsync = async () => {
-        const inResult = await this._def.in._parseAsync({
-          data: ctx.data,
-          path: ctx.path,
-          parent: ctx,
-        });
-        if (inResult.status === "aborted") return INVALID;
-        if (inResult.status === "dirty") {
-          status.dirty();
-          return DIRTY(inResult.value);
-        } else {
-          return this._def.out._parseAsync({
-            data: inResult.value,
-            path: ctx.path,
-            parent: ctx,
-          });
-        }
-      };
-      return handleAsync();
-    } else {
-      const inResult = this._def.in._parseSync({
-        data: ctx.data,
-        path: ctx.path,
-        parent: ctx,
-      });
-      if (inResult.status === "aborted") return INVALID;
-      if (inResult.status === "dirty") {
-        status.dirty();
-        return {
-          status: "dirty",
-          value: inResult.value,
-        };
-      } else {
-        return this._def.out._parseSync({
-          data: inResult.value,
-          path: ctx.path,
-          parent: ctx,
-        });
-      }
-    }
-  }
-
-  static create<A extends ZodTypeAny, B extends ZodTypeAny>(
-    a: A,
-    b: B
-  ): ZodPipeline<A, B> {
-    return new ZodPipeline({
-      in: a,
-      out: b,
-      typeName: ZodFirstPartyTypeKind.ZodPipeline,
-    });
-  }
-}
-
 ///////////////////////////////////////////
 ///////////////////////////////////////////
 //////////                       //////////
@@ -5007,7 +4927,6 @@ export enum ZodFirstPartyTypeKind {
   ZodNullable = "ZodNullable",
   ZodPromise = "ZodPromise",
   ZodBranded = "ZodBranded",
-  ZodPipeline = "ZodPipeline",
   ZodReadonly = "ZodReadonly",
 }
 export type ZodFirstPartySchemaTypes =
@@ -5042,7 +4961,6 @@ export type ZodFirstPartySchemaTypes =
   | ZodNullable<any>
   | ZodPromise<any>
   | ZodBranded<any, any>
-  | ZodPipeline<any, any>
   | ZodReadonly<any>
   | ZodSymbol;
 
@@ -5090,7 +5008,6 @@ const promiseType = ZodPromise.create;
 const effectsType = ZodEffects.create;
 const optionalType = ZodOptional.create;
 const nullableType = ZodNullable.create;
-const pipelineType = ZodPipeline.create;
 const ostring = () => stringType().optional();
 const onumber = () => numberType().optional();
 const oboolean = () => booleanType().optional();
@@ -5121,7 +5038,6 @@ export {
   onumber,
   optionalType as optional,
   ostring,
-  pipelineType as pipeline,
   promiseType as promise,
   recordType as record,
   setType as set,
