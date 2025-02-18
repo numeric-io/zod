@@ -466,7 +466,6 @@ export abstract class ZodType<
     this.or = this.or.bind(this);
     this.and = this.and.bind(this);
     this.brand = this.brand.bind(this);
-    this.default = this.default.bind(this);
     this.describe = this.describe.bind(this);
     this.pipe = this.pipe.bind(this);
     this.readonly = this.readonly.bind(this);
@@ -501,19 +500,6 @@ export abstract class ZodType<
 
   and<T extends ZodTypeAny>(incoming: T): ZodIntersection<this, T> {
     return ZodIntersection.create(this, incoming, this._def);
-  }
-
-  default(def: util.noUndefined<Input>): ZodDefault<this>;
-  default(def: () => util.noUndefined<Input>): ZodDefault<this>;
-  default(def: any) {
-    const defaultValueFunc = typeof def === "function" ? def : () => def;
-
-    return new ZodDefault({
-      ...processCreateParams(this._def),
-      innerType: this,
-      defaultValue: defaultValueFunc,
-      typeName: ZodFirstPartyTypeKind.ZodDefault,
-    }) as any;
   }
 
   brand<B extends string | number | symbol>(brand?: B): ZodBranded<this, B>;
@@ -3164,8 +3150,6 @@ const getDiscriminator = <T extends ZodTypeAny>(type: T): Primitive[] => {
   } else if (type instanceof ZodNativeEnum) {
     // eslint-disable-next-line ban/ban
     return util.objectValues(type.enum as any);
-  } else if (type instanceof ZodDefault) {
-    return getDiscriminator(type._def.innerType);
   } else if (type instanceof ZodUndefined) {
     return [undefined];
   } else if (type instanceof ZodNull) {
@@ -4711,60 +4695,6 @@ export class ZodNullable<T extends ZodTypeAny> extends ZodType<
   };
 }
 
-////////////////////////////////////////////
-////////////////////////////////////////////
-//////////                        //////////
-//////////       ZodDefault       //////////
-//////////                        //////////
-////////////////////////////////////////////
-////////////////////////////////////////////
-export interface ZodDefaultDef<T extends ZodTypeAny = ZodTypeAny>
-  extends ZodTypeDef {
-  innerType: T;
-  defaultValue: () => util.noUndefined<T["_input"]>;
-  typeName: ZodFirstPartyTypeKind.ZodDefault;
-}
-
-export class ZodDefault<T extends ZodTypeAny> extends ZodType<
-  util.noUndefined<T["_output"]>,
-  ZodDefaultDef<T>,
-  T["_input"] | undefined
-> {
-  _parse(input: ParseInput): ParseReturnType<this["_output"]> {
-    const { ctx } = this._processInputParams(input);
-    let data = ctx.data;
-    if (ctx.parsedType === ZodParsedType.undefined) {
-      data = this._def.defaultValue();
-    }
-    return this._def.innerType._parse({
-      data,
-      path: ctx.path,
-      parent: ctx,
-    });
-  }
-
-  removeDefault() {
-    return this._def.innerType;
-  }
-
-  static create = <T extends ZodTypeAny>(
-    type: T,
-    params: RawCreateParams & {
-      default: T["_input"] | (() => util.noUndefined<T["_input"]>);
-    }
-  ): ZodDefault<T> => {
-    return new ZodDefault({
-      innerType: type,
-      typeName: ZodFirstPartyTypeKind.ZodDefault,
-      defaultValue:
-        typeof params.default === "function"
-          ? params.default
-          : () => params.default as any,
-      ...processCreateParams(params),
-    }) as any;
-  };
-}
-
 /////////////////////////////////////////
 /////////////////////////////////////////
 //////////                     //////////
@@ -5075,7 +5005,6 @@ export enum ZodFirstPartyTypeKind {
   ZodNativeEnum = "ZodNativeEnum",
   ZodOptional = "ZodOptional",
   ZodNullable = "ZodNullable",
-  ZodDefault = "ZodDefault",
   ZodPromise = "ZodPromise",
   ZodBranded = "ZodBranded",
   ZodPipeline = "ZodPipeline",
@@ -5111,7 +5040,6 @@ export type ZodFirstPartySchemaTypes =
   | ZodNativeEnum<any>
   | ZodOptional<any>
   | ZodNullable<any>
-  | ZodDefault<any>
   | ZodPromise<any>
   | ZodBranded<any, any>
   | ZodPipeline<any, any>
