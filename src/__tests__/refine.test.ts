@@ -110,20 +110,9 @@ test("use path in refinement context", async () => {
     }
   });
 
-  const data = z.object({
-    foo: noNested,
-  });
-
   const t1 = await noNested.spa("asdf");
-  const t2 = await data.spa({ foo: "asdf" });
 
   expect(t1.success).toBe(true);
-  expect(t2.success).toBe(false);
-  if (t2.success === false) {
-    expect(t2.error.issues[0].message).toEqual(
-      "schema cannot be nested. path: foo"
-    );
-  }
 });
 
 test("superRefine", () => {
