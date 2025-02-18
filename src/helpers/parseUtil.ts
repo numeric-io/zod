@@ -117,11 +117,32 @@ export class ParseStatus {
 
   static mergeObjectStatus(
     status: ParseStatus,
-    validations: ParseReturnType<any>[]
-  ): ParseReturnType<any> {
+    pairs: {
+      key: SyncParseReturnType<any>;
+      value: SyncParseReturnType<any>;
+      alwaysSet?: boolean;
+    }[]
+  ): SyncParseReturnType {
+    for (const pair of pairs) {
+      const { key, value } = pair;
+      if (key.status === "aborted") return INVALID;
+      if (value.status === "aborted") return INVALID;
+      if (key.status === "dirty") status.dirty();
+      if (value.status === "dirty") status.dirty();
+    }
+
+    // NOTE: (justinpchang) We only return status. value is empty since we don't
+    // want to return the data.
+    return { status: status.value, value: {} };
+  }
+
+  static mergeValidations(
+    status: ParseStatus,
+    validations: SyncParseReturnType<any>[]
+  ): SyncParseReturnType {
     for (const validation of validations) {
-      if (isAborted(validation)) return INVALID;
-      if (isDirty(validation)) status.dirty();
+      if (validation.status === "aborted") return INVALID;
+      if (validation.status === "dirty") status.dirty();
     }
 
     // NOTE: (justinpchang) We only return status. value is empty since we don't

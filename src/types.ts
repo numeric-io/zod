@@ -2519,10 +2519,7 @@ export class ZodObject<
       const result = keyValidator._parse(
         new ParseInputLazyPath(ctx, ctx.data[key], ctx.path, key)
       );
-      validations.push(result);
-      if (result === INVALID) {
-        status.dirty();
-      }
+      validations.push(result as any);
     }
 
     // Compute the extra keys in the input that are not defined in the schema.
@@ -2582,12 +2579,12 @@ export class ZodObject<
     // Otherwise, return immediately.
     if (ctx.common.async) {
       return Promise.all(validations).then(() => {
-        const merged = ParseStatus.mergeObjectStatus(status, validations);
+        const merged = ParseStatus.mergeValidations(status, validations as any);
         if (isValid(merged)) return OK(ctx.data);
         return merged;
       });
     } else {
-      const merged = ParseStatus.mergeObjectStatus(status, validations);
+      const merged = ParseStatus.mergeValidations(status, validations as any);
       if (isValid(merged)) return OK(ctx.data);
       return merged;
     }
