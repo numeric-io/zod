@@ -41,8 +41,6 @@ test("first party switch", () => {
       break;
     case z.ZodFirstPartyTypeKind.ZodDiscriminatedUnion:
       break;
-    case z.ZodFirstPartyTypeKind.ZodIntersection:
-      break;
     case z.ZodFirstPartyTypeKind.ZodTuple:
       break;
     case z.ZodFirstPartyTypeKind.ZodRecord:
@@ -67,15 +65,9 @@ test("first party switch", () => {
       break;
     case z.ZodFirstPartyTypeKind.ZodNullable:
       break;
-    case z.ZodFirstPartyTypeKind.ZodDefault:
-      break;
-    case z.ZodFirstPartyTypeKind.ZodCatch:
-      break;
     case z.ZodFirstPartyTypeKind.ZodPromise:
       break;
     case z.ZodFirstPartyTypeKind.ZodBranded:
-      break;
-    case z.ZodFirstPartyTypeKind.ZodPipeline:
       break;
     case z.ZodFirstPartyTypeKind.ZodSymbol:
       break;

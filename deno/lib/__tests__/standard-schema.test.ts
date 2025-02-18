@@ -3,7 +3,6 @@ import { expect } from "https://deno.land/x/expect@v0.2.6/mod.ts";
 const test = Deno.test;
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 
-import { util } from "../helpers/util.ts";
 import * as z from "../index.ts";
 
 test("assignability", () => {
@@ -12,14 +11,6 @@ test("assignability", () => {
   const _s3: StandardSchemaV1<string, string> = z.string();
   const _s4: StandardSchemaV1<unknown, string> = z.string();
   [_s1, _s2, _s3, _s4];
-});
-
-test("type inference", () => {
-  const stringToNumber = z.string().transform((x) => x.length);
-  type input = StandardSchemaV1.InferInput<typeof stringToNumber>;
-  util.assertEqual<input, string>(true);
-  type output = StandardSchemaV1.InferOutput<typeof stringToNumber>;
-  util.assertEqual<output, number>(true);
 });
 
 test("valid parse", () => {

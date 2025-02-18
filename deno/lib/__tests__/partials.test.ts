@@ -135,7 +135,6 @@ test("required", () => {
   const object = z.object({
     name: z.string(),
     age: z.number().optional(),
-    field: z.string().optional().default("asdf"),
     nullableField: z.number().nullable(),
     nullishField: z.string().nullish(),
   });
@@ -143,7 +142,6 @@ test("required", () => {
   const requiredObject = object.required();
   expect(requiredObject.shape.name).toBeInstanceOf(z.ZodString);
   expect(requiredObject.shape.age).toBeInstanceOf(z.ZodNumber);
-  expect(requiredObject.shape.field).toBeInstanceOf(z.ZodDefault);
   expect(requiredObject.shape.nullableField).toBeInstanceOf(z.ZodNullable);
   expect(requiredObject.shape.nullishField).toBeInstanceOf(z.ZodNullable);
 });
@@ -152,7 +150,6 @@ test("required inference", () => {
   const object = z.object({
     name: z.string(),
     age: z.number().optional(),
-    field: z.string().optional().default("asdf"),
     nullableField: z.number().nullable(),
     nullishField: z.string().nullish(),
   });
@@ -163,7 +160,6 @@ test("required inference", () => {
   type expected = {
     name: string;
     age: number;
-    field: string;
     nullableField: number | null;
     nullishField: string | null;
   };
@@ -174,14 +170,12 @@ test("required with mask", () => {
   const object = z.object({
     name: z.string(),
     age: z.number().optional(),
-    field: z.string().optional().default("asdf"),
     country: z.string().optional(),
   });
 
   const requiredObject = object.required({ age: true });
   expect(requiredObject.shape.name).toBeInstanceOf(z.ZodString);
   expect(requiredObject.shape.age).toBeInstanceOf(z.ZodNumber);
-  expect(requiredObject.shape.field).toBeInstanceOf(z.ZodDefault);
   expect(requiredObject.shape.country).toBeInstanceOf(z.ZodOptional);
 });
 
@@ -189,7 +183,6 @@ test("required with mask -- ignore falsy values", () => {
   const object = z.object({
     name: z.string(),
     age: z.number().optional(),
-    field: z.string().optional().default("asdf"),
     country: z.string().optional(),
   });
 
@@ -197,7 +190,6 @@ test("required with mask -- ignore falsy values", () => {
   const requiredObject = object.required({ age: true, country: false });
   expect(requiredObject.shape.name).toBeInstanceOf(z.ZodString);
   expect(requiredObject.shape.age).toBeInstanceOf(z.ZodNumber);
-  expect(requiredObject.shape.field).toBeInstanceOf(z.ZodDefault);
   expect(requiredObject.shape.country).toBeInstanceOf(z.ZodOptional);
 });
 
@@ -205,17 +197,13 @@ test("partial with mask", async () => {
   const object = z.object({
     name: z.string(),
     age: z.number().optional(),
-    field: z.string().optional().default("asdf"),
     country: z.string(),
   });
 
-  const masked = object
-    .partial({ age: true, field: true, name: true })
-    .strict();
+  const masked = object.partial({ age: true, name: true }).strict();
 
   expect(masked.shape.name).toBeInstanceOf(z.ZodOptional);
   expect(masked.shape.age).toBeInstanceOf(z.ZodOptional);
-  expect(masked.shape.field).toBeInstanceOf(z.ZodOptional);
   expect(masked.shape.country).toBeInstanceOf(z.ZodString);
 
   masked.parse({ country: "US" });
@@ -226,7 +214,6 @@ test("partial with mask -- ignore falsy values", async () => {
   const object = z.object({
     name: z.string(),
     age: z.number().optional(),
-    field: z.string().optional().default("asdf"),
     country: z.string(),
   });
 
@@ -235,19 +222,8 @@ test("partial with mask -- ignore falsy values", async () => {
 
   expect(masked.shape.name).toBeInstanceOf(z.ZodOptional);
   expect(masked.shape.age).toBeInstanceOf(z.ZodOptional);
-  expect(masked.shape.field).toBeInstanceOf(z.ZodDefault);
   expect(masked.shape.country).toBeInstanceOf(z.ZodString);
 
   masked.parse({ country: "US" });
   await masked.parseAsync({ country: "US" });
-});
-
-test("deeppartial array", () => {
-  const schema = z.object({ array: z.string().array().min(42) }).deepPartial();
-
-  // works as expected
-  schema.parse({});
-
-  // should be false, but is true
-  expect(schema.safeParse({ array: [] }).success).toBe(false);
 });

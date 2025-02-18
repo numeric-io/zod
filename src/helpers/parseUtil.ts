@@ -115,23 +115,7 @@ export class ParseStatus {
     return { status: status.value, value: arrayValue };
   }
 
-  static async mergeObjectAsync(
-    status: ParseStatus,
-    pairs: { key: ParseReturnType<any>; value: ParseReturnType<any> }[]
-  ): Promise<SyncParseReturnType<any>> {
-    const syncPairs: ObjectPair[] = [];
-    for (const pair of pairs) {
-      const key = await pair.key;
-      const value = await pair.value;
-      syncPairs.push({
-        key,
-        value,
-      });
-    }
-    return ParseStatus.mergeObjectSync(status, syncPairs);
-  }
-
-  static mergeObjectSync(
+  static mergeObjectStatus(
     status: ParseStatus,
     pairs: {
       key: SyncParseReturnType<any>;
@@ -139,23 +123,17 @@ export class ParseStatus {
       alwaysSet?: boolean;
     }[]
   ): SyncParseReturnType {
-    const finalObject: any = {};
     for (const pair of pairs) {
       const { key, value } = pair;
       if (key.status === "aborted") return INVALID;
       if (value.status === "aborted") return INVALID;
       if (key.status === "dirty") status.dirty();
       if (value.status === "dirty") status.dirty();
-
-      if (
-        key.value !== "__proto__" &&
-        (typeof value.value !== "undefined" || pair.alwaysSet)
-      ) {
-        finalObject[key.value] = value.value;
-      }
     }
 
-    return { status: status.value, value: finalObject };
+    // NOTE: (justinpchang) We only return status. value is empty since we don't
+    // want to return the data.
+    return { status: status.value, value: {} };
   }
 }
 export interface ParseResult {

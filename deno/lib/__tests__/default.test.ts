@@ -9,24 +9,6 @@ test("basic defaults", () => {
   expect(z.string().default("default").parse(undefined)).toBe("default");
 });
 
-test("default with transform", () => {
-  const stringWithDefault = z
-    .string()
-    .transform((val) => val.toUpperCase())
-    .default("default");
-  expect(stringWithDefault.parse(undefined)).toBe("DEFAULT");
-  expect(stringWithDefault).toBeInstanceOf(z.ZodDefault);
-  expect(stringWithDefault._def.innerType).toBeInstanceOf(z.ZodEffects);
-  expect(stringWithDefault._def.innerType._def.schema).toBeInstanceOf(
-    z.ZodSchema
-  );
-
-  type inp = z.input<typeof stringWithDefault>;
-  util.assertEqual<inp, string | undefined>(true);
-  type out = z.output<typeof stringWithDefault>;
-  util.assertEqual<out, string>(true);
-});
-
 test("default on existing optional", () => {
   const stringWithDefault = z.string().optional().default("asdf");
   expect(stringWithDefault.parse(undefined)).toBe("asdf");
@@ -49,19 +31,6 @@ test("optional on default", () => {
   util.assertEqual<inp, string | undefined>(true);
   type out = z.output<typeof stringWithDefault>;
   util.assertEqual<out, string | undefined>(true);
-});
-
-test("complex chain example", () => {
-  const complex = z
-    .string()
-    .default("asdf")
-    .transform((val) => val.toUpperCase())
-    .default("qwer")
-    .removeDefault()
-    .optional()
-    .default("asdfasdf");
-
-  expect(complex.parse(undefined)).toBe("ASDFASDF");
 });
 
 test("removeDefault", () => {

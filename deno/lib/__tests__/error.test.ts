@@ -235,12 +235,10 @@ test("custom path", () => {
 });
 
 test("custom path", () => {
-  const schema = z
-    .object({
-      password: z.string().min(6),
-      confirm: z.string().min(6),
-    })
-    .refine((val) => val.confirm === val.password);
+  const schema = z.object({
+    password: z.string().min(6),
+    confirm: z.string().min(6),
+  });
 
   const result = schema.safeParse({
     password: "qwer",
@@ -249,7 +247,7 @@ test("custom path", () => {
 
   expect(result.success).toEqual(false);
   if (!result.success) {
-    expect(result.error.issues.length).toEqual(3);
+    expect(result.error.issues.length).toEqual(2);
   }
 });
 

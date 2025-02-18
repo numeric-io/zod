@@ -20,11 +20,6 @@ export const crazySchema = z.object({
   //   return arg.reduce((a, b) => a + b, 0);
   // }),
   sumMinLength: z.array(z.number()).refine((arg) => arg.length > 5),
-  intersection: z.intersection(
-    z.object({ p1: z.string().optional() }),
-    z.object({ p1: z.number().optional() })
-  ),
-  enum: z.intersection(z.enum(["zero", "one"]), z.enum(["one", "two"])),
   nonstrict: z.object({ points: z.number() }).nonstrict(),
   numProm: z.promise(z.number()),
   lenfun: z.function(z.tuple([z.string()]), z.boolean()),
