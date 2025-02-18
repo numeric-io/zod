@@ -2508,91 +2508,79 @@ export class ZodObject<
     }
 
     const { status, ctx } = this._processInputParams(input);
-
     const { shape, keys: shapeKeys } = this._getCached();
-    const extraKeys: string[] = [];
 
-    for (const key in ctx.data) {
-      if (!shapeKeys.includes(key)) {
-        extraKeys.push(key);
-      }
-    }
-
-    const pairs: {
-      key: ParseReturnType<any>;
-      value: ParseReturnType<any>;
-      alwaysSet?: boolean;
-    }[] = [];
+    // Validate each pair in the defined shape.
+    const validations: ParseReturnType<any>[] = [];
     for (const key of shapeKeys) {
       const keyValidator = shape[key];
-      const value = ctx.data[key];
-      pairs.push({
-        key: { status: "valid", value: key },
-        value: keyValidator._parse(
-          new ParseInputLazyPath(ctx, value, ctx.path, key)
-        ),
-        alwaysSet: key in ctx.data,
-      });
+      const result = keyValidator._parse(
+        new ParseInputLazyPath(ctx, ctx.data[key], ctx.path, key)
+      );
+      validations.push(result as any);
     }
 
-    if (this._def.catchall instanceof ZodNever) {
-      const unknownKeys = this._def.unknownKeys;
+    // Compute the extra keys in the input that are not defined in the schema.
+    const extraKeys: string[] = [];
+    const unknownKeys = this._def.unknownKeys;
+    if (
+      unknownKeys !== "passthrough" &&
+      // eslint-disable-next-line ban/ban
+      Object.keys(ctx.data).length !== shapeKeys.length
+    ) {
+      const shapeKeysSet = new Set(shapeKeys);
+      for (const key in ctx.data) {
+        if (!shapeKeysSet.has(key)) {
+          extraKeys.push(key);
+        }
+      }
+    }
 
-      if (unknownKeys === "passthrough") {
-        // NOTE: (justinpchang) This is default behavior when returning input.
-      } else if (unknownKeys === "strict") {
-        if (extraKeys.length > 0) {
-          addIssueToContext(ctx, {
-            code: ZodIssueCode.unrecognized_keys,
-            keys: extraKeys,
-          });
-          status.dirty();
+    // Handle extra keys.
+    if (this._def.catchall instanceof ZodNever) {
+      if (extraKeys.length) {
+        if (unknownKeys === "passthrough") {
+          // NOTE: (justinpchang) This is default behavior when returning input.
+        } else if (unknownKeys === "strict") {
+          if (extraKeys.length > 0) {
+            addIssueToContext(ctx, {
+              code: ZodIssueCode.unrecognized_keys,
+              keys: extraKeys,
+            });
+            status.dirty();
+          }
+        } else if (unknownKeys === "strip") {
+          for (const key of extraKeys) {
+            delete ctx.data[key];
+          }
+        } else {
+          throw new Error(
+            `Internal ZodObject error: invalid unknownKeys value.`
+          );
         }
-      } else if (unknownKeys === "strip") {
-        for (const key of extraKeys) {
-          delete ctx.data[key];
-        }
-      } else {
-        throw new Error(`Internal ZodObject error: invalid unknownKeys value.`);
       }
     } else {
-      // run catchall validation
+      // Run catchall validation on each extra key.
       const catchall = this._def.catchall;
-
       for (const key of extraKeys) {
-        const value = ctx.data[key];
-        pairs.push({
-          key: { status: "valid", value: key },
-          value: catchall._parse(
-            new ParseInputLazyPath(ctx, value, ctx.path, key) //, ctx.child(key), value, getParsedType(value)
-          ),
-          alwaysSet: key in ctx.data,
-        });
+        const result = catchall._parse(
+          new ParseInputLazyPath(ctx, ctx.data[key], ctx.path, key)
+        );
+        validations.push(result);
+        if (result === INVALID) {
+          status.dirty();
+        }
       }
     }
 
     if (ctx.common.async) {
-      return Promise.resolve()
-        .then(async () => {
-          const syncPairs: any[] = [];
-          for (const pair of pairs) {
-            const key = await pair.key;
-            const value = await pair.value;
-            syncPairs.push({
-              key,
-              value,
-              alwaysSet: pair.alwaysSet,
-            });
-          }
-          return syncPairs;
-        })
-        .then((syncPairs) => {
-          const merged = ParseStatus.mergeObjectStatus(status, syncPairs);
-          if (isValid(merged)) return OK(ctx.data);
-          return merged;
-        });
+      return Promise.all(validations).then(() => {
+        const merged = ParseStatus.mergeValidations(status, validations as any);
+        if (isValid(merged)) return OK(ctx.data);
+        return merged;
+      });
     } else {
-      const merged = ParseStatus.mergeObjectStatus(status, pairs as any);
+      const merged = ParseStatus.mergeValidations(status, validations as any);
       if (isValid(merged)) return OK(ctx.data);
       return merged;
     }

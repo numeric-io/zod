@@ -135,6 +135,20 @@ export class ParseStatus {
     // want to return the data.
     return { status: status.value, value: {} };
   }
+
+  static mergeValidations(
+    status: ParseStatus,
+    validations: SyncParseReturnType<any>[]
+  ): SyncParseReturnType {
+    for (const validation of validations) {
+      if (validation.status === "aborted") return INVALID;
+      if (validation.status === "dirty") status.dirty();
+    }
+
+    // NOTE: (justinpchang) We only return status. value is empty since we don't
+    // want to return the data.
+    return { status: status.value, value: {} };
+  }
 }
 export interface ParseResult {
   status: "aborted" | "dirty" | "valid";
