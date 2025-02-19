@@ -2550,9 +2550,9 @@ export class ZodObject<
             status.dirty();
           }
         } else if (unknownKeys === "strip") {
-          for (const key of extraKeys) {
-            delete ctx.data[key];
-          }
+          // NOTE: (justinpchang) Defer deletion until after the validation has
+          // succeeded to avoid modifying the input data and then failing
+          // halfway.
         } else {
           throw new Error(
             `Internal ZodObject error: invalid unknownKeys value.`
@@ -2576,12 +2576,34 @@ export class ZodObject<
     if (ctx.common.async) {
       return Promise.all(validations).then(() => {
         const merged = ParseStatus.mergeValidations(status, validations as any);
-        if (isValid(merged)) return OK(ctx.data);
+        if (isValid(merged)) {
+          if (
+            extraKeys.length &&
+            unknownKeys === "strip" &&
+            this._def.catchall instanceof ZodNever
+          ) {
+            for (const key of extraKeys) {
+              delete ctx.data[key];
+            }
+          }
+          return OK(ctx.data);
+        }
         return merged;
       });
     } else {
       const merged = ParseStatus.mergeValidations(status, validations as any);
-      if (isValid(merged)) return OK(ctx.data);
+      if (isValid(merged)) {
+        if (
+          extraKeys.length &&
+          unknownKeys === "strip" &&
+          this._def.catchall instanceof ZodNever
+        ) {
+          for (const key of extraKeys) {
+            delete ctx.data[key];
+          }
+        }
+        return OK(ctx.data);
+      }
       return merged;
     }
   }
